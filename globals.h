@@ -621,7 +621,7 @@ extern const char *weekdstr;
 #define DEFAULT_CC_RESHARE  -1 // Use global cfg
 #define DEFAULT_CC_IGNRSHR  -1 // Use global cfg
 #define DEFAULT_CC_STEALTH  -1 // Use global cfg
-#define DEFAULT_CC_KEEPALIVE 0
+#define DEFAULT_CC_KEEPALIVE 1
 #define DEFAULT_CC_RECONNECT 12000
 #define DEFAULT_CC_RECV_TIMEOUT 2000
 
