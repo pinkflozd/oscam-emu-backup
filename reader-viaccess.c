@@ -1131,7 +1131,7 @@ static int32_t viaccess_do_ecm(struct s_reader *reader, const ECM_REQUEST *er, s
 				// as some card don't support this
 				if(csystem_data->last_geo.number_ecm > 0)
 				{
-					if(csystem_data->last_geo.number_ecm == curnumber_ecm && !(ecm88Data[nanoLen - 1] == 0x01))
+					if((csystem_data->last_geo.number_ecm & 0xFF00) == (curnumber_ecm & 0xFF00) && !(ecm88Data[nanoLen - 1] == 0x01))
 					{
 						keynr = ecm88Data[5];
 						rdr_log_dbg(reader, D_READER, "keyToUse = %02x, ECM ending with %02x", ecm88Data[5], ecm88Data[nanoLen - 1]);
