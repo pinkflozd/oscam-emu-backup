@@ -45,7 +45,6 @@ static void smargo_set_config_mode_off(struct s_reader *reader)
 
 static int32_t smargo_set_settings(struct s_reader *reader, int32_t freq, unsigned char T, unsigned char inv, uint16_t Fi, unsigned char Di, unsigned char Ni)
 {
-	/*
 	uint16_t  freqk = (freq * 10);
 	uchar data[4];
 
@@ -81,7 +80,6 @@ static int32_t smargo_set_settings(struct s_reader *reader, int32_t freq, unsign
 	IO_Serial_Write(reader, 0, 1000, 2, data);
 
 	smargo_set_config_mode_off(reader);
-	*/
 
 	return OK;
 }

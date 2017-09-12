@@ -1634,7 +1634,6 @@ static int32_t SR_Receive(struct s_reader *reader, unsigned char *buffer, uint32
 
 int32_t SR_WriteSettings(struct s_reader *reader, uint16_t  F, unsigned char D, uint32_t N, unsigned char T, uint16_t  convention)
 {
-	/*
 	// smartreader supports 3.20, 3.43, 3.69, 4.00, 4.36, 4.80, 5.34, 6.00, 6.86, 8.00, 9.61, 12.0, 16.0 MHz
 	struct sr_data *crdr_data = reader->crdr_data;
 	crdr_data->inv = convention;//FIXME this one is set by icc_async and local smartreader reset routine
@@ -1646,7 +1645,6 @@ int32_t SR_WriteSettings(struct s_reader *reader, uint16_t  F, unsigned char D, 
 	smart_flush(reader);
 	EnableSmartReader(reader, baud_temp2, reader->mhz, F, D, N, T, crdr_data->inv, crdr_data->parity);
 	smart_fastpoll(reader, 0);
-	*/
 
 	return OK;
 }
