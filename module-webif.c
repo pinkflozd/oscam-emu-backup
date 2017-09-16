@@ -661,7 +661,6 @@ static char *send_oscam_config_global(struct templatevars *vars, struct uriparam
 	tpl_printf(vars, TPLADD, "FALLBACKTIMEOUT", "%u", cfg.ftimeout);
 	tpl_printf(vars, TPLADD, "CLIENTMAXIDLE", "%u", cfg.cmaxidle);
 
-
 	value = mk_t_caidvaluetab(&cfg.ftimeouttab);
 	tpl_addVar(vars, TPLADD, "FALLBACKTIMEOUT_PERCAID", value);
 	free_mk_t(value);
@@ -810,10 +809,25 @@ static char *send_oscam_config_loadbalancer(struct templatevars *vars, struct ur
 	free_mk_t(value);
 
 	tpl_printf(vars, TPLADD, "LBREOPENSECONDS", "%d", cfg.lb_reopen_seconds);
+	tpl_printf(vars, TPLADD, "LBREOPENSECONDSLBMIN", "%d", cfg.lb_reopen_seconds_lbmin);
 	tpl_printf(vars, TPLADD, "LBCLEANUP", "%d", cfg.lb_stat_cleanup);
 
 	tpl_addVar(vars, TPLADD, "LBREOPENINVALID", (cfg.lb_reopen_invalid == 1) ? "checked" : "");
 	tpl_addVar(vars, TPLADD, "LBFORCEALWAYS", (cfg.lb_force_reopen_always == 1) ? "checked" : "");
+
+	struct s_auth *account;
+	int8_t i = 0;
+	for(account = cfg.account; (account); account = account->next)
+	{
+		tpl_addVar(vars, TPLADD, "LBFORCEALWAYSUSER", (account->lb_force_reopen_user == 1) ? "yes" : "-");
+		tpl_addVar(vars, TPLADD, "LBFORCEALWAYSUSER_LB_MIN", (account->lb_force_reopen_user_lb_min == 1) ? "yes" : "-");
+		tpl_addVar(vars, TPLADD, "USERNAME", xml_encode(vars, account->usr));
+		tpl_addVar(vars, TPLAPPEND, "CONFIGFORCEREOPENUSERSUSERINS", tpl_getTpl(vars, "CONFIGFORCEREOPENUSERSUSER"));
+		i += 1;
+	}
+	if(i){
+		tpl_addVar(vars, TPLADD, "CONFIGFORCEREOPENUSERSINS", tpl_getTpl(vars, "CONFIGFORCEREOPENUSERS"));
+	}
 
 	value = mk_t_caidtab(&cfg.lb_noproviderforcaid);
 	tpl_addVar(vars, TPLADD, "LBNOPROVIDERFORCAID", value);
@@ -1588,6 +1602,7 @@ static char *send_oscam_config_anticasc(struct templatevars *vars, struct uripar
 
 	if(cfg.acosc_enabled == 1)
 		{ tpl_addVar(vars, TPLADD, "ACOSC_CHECKED", "checked"); }
+	tpl_printf(vars, TPLADD, "ACOSC_MAX_ECMS_PER_MINUTE", "%d", cfg.acosc_max_ecms_per_minute);
 	tpl_printf(vars, TPLADD, "ACOSC_MAX_ACTIVE_SIDS", "%d", cfg.acosc_max_active_sids);
 	tpl_printf(vars, TPLADD, "ACOSC_ZAP_LIMIT", "%d", cfg.acosc_zap_limit);
 	tpl_printf(vars, TPLADD, "TMP", "ACOSC_PENALTY%d", cfg.acosc_penalty);
@@ -1850,15 +1865,22 @@ static char *send_oscam_reader(struct templatevars *vars, struct uriparams *para
 			}else{
 				tpl_printf(vars, TPLAPPEND, "EXISTING_INS", ",'%s'", urlencode(vars, rdr->label));
 			}
-			tpl_addVar(vars, TPLADD, "CTYP", reader_get_type_desc(rdr, 0));
-			tpl_addVar(vars, TPLADD, "CTYPSORT", reader_get_type_desc(rdr, 0));
+			tpl_addVar(vars, TPLADD, "CTYP", reader_get_type_desc(rdr));
+			tpl_addVar(vars, TPLADD, "CTYPSORT", reader_get_type_desc(rdr));
 
 			tpl_addVar(vars, TPLADD, "READERCLASS", rdr->enable ? "enabledreader" : "disabledreader");
 
 			if(rdr->enable) { active_readers += 1; }
 			else { disabled_readers += 1; }
 
-			if(rdr->tcp_connected) { connected_readers += 1; }
+			if(rdr->tcp_connected) {
+				connected_readers += 1;
+				tpl_addVar(vars, TPLADD, "READERIP", cs_inet_ntoa(rdr->client->ip));
+			}
+			else
+			{
+				tpl_addVar(vars, TPLADD, "READERIP", "offline");
+			}
 
 			if(rdr->description)
 				tpl_printf(vars, TPLADD, "DESCRIPTION","%s(%s)",!apicall?"&#13;":"",xml_encode(vars, rdr->description));
@@ -1868,7 +1890,7 @@ static char *send_oscam_reader(struct templatevars *vars, struct uriparams *para
 			if(cfg.http_showpicons && !apicall)
 			{
 				tpl_addVar(vars, TPLADD, "READERBIT", tpl_getTpl(vars, picon_exists(xml_encode(vars, rdr->label)) ? "READERNAMEBIT" : "READERNOICON"));
-				tpl_addVar(vars, TPLADD, "CTYP", picon_exists(xml_encode(vars, reader_get_type_desc(rdr, 0))) ? tpl_getTpl(vars, "READERCTYPBIT") : tpl_getTpl(vars, "READERCTYPNOICON"));
+				tpl_addVar(vars, TPLADD, "CTYP", picon_exists(xml_encode(vars, reader_get_type_desc(rdr))) ? tpl_getTpl(vars, "READERCTYPBIT") : tpl_getTpl(vars, "READERCTYPNOICON"));
 			}
 			else
 				tpl_addVar(vars, TPLADD, "READERBIT", tpl_getTpl(vars, "READERLABEL"));
@@ -2199,7 +2221,7 @@ static char *send_oscam_reader_config(struct templatevars *vars, struct uriparam
 	free_mk_t(value);
 
 #ifdef WITH_LB
-		tpl_addVar(vars, TPLADD, "LBFORCEFALLBACK", (rdr->lb_force_fallback == 1) ? "checked" : "");
+	tpl_addVar(vars, TPLADD, "LBFORCEFALLBACK", (rdr->lb_force_fallback == 1) ? "checked" : "");
 #endif
 
 #ifdef CS_CACHEEX
@@ -3398,7 +3420,9 @@ static char *send_oscam_user_config_edit(struct templatevars *vars, struct uripa
 	{
 		tpl_printf(vars, TPLADD, "PENALTYVALUE", "%d", account->ac_penalty);
 	}
+	tpl_printf(vars, TPLADD, "ACOSC_MAX_ECMS_PER_MINUTE", "%d", account->acosc_max_ecms_per_minute);
 	tpl_printf(vars, TPLADD, "ACOSC_MAX_ACTIVE_SIDS", "%d", account->acosc_max_active_sids);
+	tpl_printf(vars, TPLADD, "CFG_ACOSC_MAX_ECMS_PER_MINUTE", "%d", cfg.acosc_max_ecms_per_minute);
 	tpl_printf(vars, TPLADD, "CFG_ACOSC_MAX_ACTIVE_SIDS", "%d", cfg.acosc_max_active_sids);
 	tpl_printf(vars, TPLADD, "ACOSC_ZAP_LIMIT", "%d", account->acosc_zap_limit);
 	tpl_printf(vars, TPLADD, "CFG_ACOSC_ZAP_LIMIT", "%d", cfg.acosc_zap_limit);
@@ -3424,6 +3448,9 @@ static char *send_oscam_user_config_edit(struct templatevars *vars, struct uripa
 			case 3:
 				tmp = "(3) CW delayed";
 				break;
+			case 4:
+				tmp = "(4) Hidecards";
+				break;
 		}
 		tpl_addVar(vars, TPLADD, "CFG_ACOSC_PENALTY", tmp);
 	} else
@@ -3435,6 +3462,14 @@ static char *send_oscam_user_config_edit(struct templatevars *vars, struct uripa
 	tpl_printf(vars, TPLADD, "CFG_ACOSC_PENALTY_DURATION", "%d", cfg.acosc_penalty_duration);
 	tpl_printf(vars, TPLADD, "ACOSC_DELAY", "%d", account->acosc_delay);
 	tpl_printf(vars, TPLADD, "CFG_ACOSC_DELAY", "%d", cfg.acosc_delay);
+#endif
+
+#ifdef WITH_LB
+	if (account->lb_force_reopen_user == 1)
+	{
+		tpl_addVar(vars, TPLADD, "LBFORCEALWAYSUSER", (account->lb_force_reopen_user == 1) ? "checked" : "");
+		tpl_addVar(vars, TPLADD, "LBFORCEALWAYSUSER_LB_MIN", (account->lb_force_reopen_user_lb_min == 1) ? "checked" : "");
+	}
 #endif
 
 #ifdef MODULE_CCCAM
@@ -3476,8 +3511,8 @@ static void webif_add_client_proto(struct templatevars *vars, struct s_client *c
 #ifdef MODULE_NEWCAMD
 	if(streq(proto, "newcamd") && cl->typ == 'c')
 	{
-		tpl_printf(vars, TPLADD, "CLIENTPROTO", "%s (%s)", proto, newcamd_get_client_name(cl->ncd_client_id));
-		tpl_printf(vars, TPLADD, "CLIENTPROTOSORT", "%s (%s)", proto, newcamd_get_client_name(cl->ncd_client_id));
+		tpl_printf(vars, TPLADD, "CLIENTPROTO", "%s (%s)", (char *)proto, newcamd_get_client_name(cl->ncd_client_id));
+		tpl_printf(vars, TPLADD, "CLIENTPROTOSORT", "%s (%s)", (char *)proto, newcamd_get_client_name(cl->ncd_client_id));
 		if(cfg.http_showpicons )
 		{
 			char picon_name[32];
@@ -3494,7 +3529,7 @@ static void webif_add_client_proto(struct templatevars *vars, struct s_client *c
 			}
 			else
 			{
-				tpl_printf(vars, TPLADD, "CLIENTPROTOTITLE", "missing icon: IC_%s_%s.tpl", proto, newcamd_get_client_name(cl->ncd_client_id));
+				tpl_printf(vars, TPLADD, "CLIENTPROTOTITLE", "missing icon: IC_%s_%s.tpl", (char *)proto, newcamd_get_client_name(cl->ncd_client_id));
 			}
 		}
 		return;
@@ -3506,11 +3541,17 @@ static void webif_add_client_proto(struct templatevars *vars, struct s_client *c
 		struct cc_data *cc = cl->cc;
 		if(cc && *cc->remote_version && *cc->remote_build)
 		{
-			tpl_printf(vars, TPLADD, "CLIENTPROTO", "%s (%s-%s)", proto, cc->remote_version, cc->remote_build);
-			tpl_printf(vars, TPLADD, "CLIENTPROTOSORT", "%s (%s-%s)", proto, cc->remote_version, cc->remote_build);
+			uint8_t mcs_ver = 0;
+			if (cc->multics_version[0] | (cc->multics_version[1] << 8))
+			{
+				mcs_ver = cc->multics_version[0] | (cc->multics_version[1] << 8);
+			}
+
+			tpl_printf(vars, TPLADD, "CLIENTPROTO", "%s (%s-%s)", (char *)proto, cc->remote_version, cc->remote_build);
+			tpl_printf(vars, TPLADD, "CLIENTPROTOSORT", "%s (%s-%s)", (char *)proto, cc->remote_version, cc->remote_build);
 			if(cccam_client_multics_mode(cl))
 			{
-				tpl_printf(vars, TPLADD, "CLIENTPROTOTITLE", "Multics, revision r%d", cc->multics_version[0] | (cc->multics_version[1] << 8));
+				tpl_printf(vars, TPLADD, "CLIENTPROTOTITLE", "Multics, revision r%d", mcs_ver);
 			}
 			else
 			{
@@ -3527,28 +3568,28 @@ static void webif_add_client_proto(struct templatevars *vars, struct s_client *c
 				switch(is_other_proto)
 				{
 					case 1:
-						snprintf(picon_name, sizeof(picon_name) / sizeof(char) - 1, "%s_r_%d", proto, cc->multics_version[0] | (cc->multics_version[1] << 8));
+						snprintf(picon_name, sizeof(picon_name) / sizeof(char) - 1, "%s_r_%d", (char *)proto, mcs_ver);
 						if(picon_exists(picon_name))
 						{
 							if (!apicall) {
 								tpl_addVar(vars, TPLADD, "CCA", (char *)proto);
 								tpl_addVar(vars, TPLADD, "CCB", "r");
-								tpl_printf(vars, TPLADD, "CCC", "%d", cc->multics_version[0] | (cc->multics_version[1] << 8));
+								tpl_printf(vars, TPLADD, "CCC", "%d", mcs_ver);
 								tpl_addVar(vars, TPLADD, "CCD", "");
 								tpl_addVar(vars, TPLADD, "CLIENTPROTO", tpl_getTpl(vars, "PROTOCCCAMPIC"));
 							} else {
-								tpl_printf(vars, TPLADDONCE, "PROTOICON", "%s_r_%d",(char *)proto, cc->multics_version[0] | (cc->multics_version[1] << 8));
+								tpl_printf(vars, TPLADDONCE, "PROTOICON", "%s_r_%d",(char *)proto, mcs_ver);
 							}
 						}
 						else
 						{
 							tpl_printf(vars, TPLADD, "CLIENTPROTOTITLE", "Multics, revision r%d missing icon: IC_%s_r_%d.tpl",
-								 cc->multics_version[0] | (cc->multics_version[1] << 8), proto, cc->multics_version[0] | (cc->multics_version[1] << 8));
+								 mcs_ver, (char *)proto, mcs_ver);
 						}
 						break;
 
 					default:
-						snprintf(picon_name, sizeof(picon_name) / sizeof(char) - 1, "%s_%s_%s", proto, cc->remote_version, cc->remote_build);
+						snprintf(picon_name, sizeof(picon_name) / sizeof(char) - 1, "%s_%s_%s", (char *)proto, cc->remote_version, cc->remote_build);
 						if(picon_exists(picon_name))
 						{
 							if (!apicall) {
@@ -3564,7 +3605,7 @@ static void webif_add_client_proto(struct templatevars *vars, struct s_client *c
 						else
 						{
 							tpl_printf(vars, TPLADD, "CLIENTPROTOTITLE", "%s missing icon: IC_%s_%s_%s.tpl",
-								 cc->extended_mode ? cc->remote_oscam : "", proto, cc->remote_version, cc->remote_build);
+								 cc->extended_mode ? cc->remote_oscam : "", (char *)proto, cc->remote_version, cc->remote_build);
 						}
 						break;
 				}
@@ -3577,10 +3618,10 @@ static void webif_add_client_proto(struct templatevars *vars, struct s_client *c
 	if(streq(proto, "dvbapi") && cl->typ == 'c' && strcmp(dvbapi_get_client_name(), ""))
 	{
 		if (!apicall)
-			tpl_printf(vars, TPLADD, "CLIENTPROTO", "<A HREF=\"#\" CLASS=\"tooltip\">%s<SPAN>client: %s<BR>protocol version: %d</SPAN></A>", proto, dvbapi_get_client_name(), dvbapi_get_client_proto_version());
+			tpl_printf(vars, TPLADD, "CLIENTPROTO", "<A HREF=\"#\" CLASS=\"tooltip\">%s<SPAN>client: %s<BR>protocol version: %d</SPAN></A>", (char *)proto, dvbapi_get_client_name(), dvbapi_get_client_proto_version());
 		else
-			tpl_printf(vars, TPLADD, "CLIENTPROTO", "%s (client: %s, protocol version: %d)", proto, dvbapi_get_client_name(), dvbapi_get_client_proto_version());
-		tpl_printf(vars, TPLADD, "CLIENTPROTOSORT", "%s", proto);
+			tpl_printf(vars, TPLADD, "CLIENTPROTO", "%s (client: %s, protocol version: %d)", (char *)proto, dvbapi_get_client_name(), dvbapi_get_client_proto_version());
+		tpl_printf(vars, TPLADD, "CLIENTPROTOSORT", "%s", (char *)proto);
 		return;
 	}
 #endif
@@ -3589,7 +3630,7 @@ static void webif_add_client_proto(struct templatevars *vars, struct s_client *c
 	if(cfg.http_showpicons)
 	{
 		char picon_name[32];
-		snprintf(picon_name, sizeof(picon_name) / sizeof(char) - 1, "%s", proto);
+		snprintf(picon_name, sizeof(picon_name) / sizeof(char) - 1, "%s", (char *)proto);
 		if(picon_exists(picon_name))
 		{
 			if (!apicall) {
@@ -3601,7 +3642,7 @@ static void webif_add_client_proto(struct templatevars *vars, struct s_client *c
 		}
 		else
 		{
-			tpl_printf(vars, TPLADD, "CLIENTPROTOTITLE", "missing icon: IC_%s.tpl", proto);
+			tpl_printf(vars, TPLADD, "CLIENTPROTOTITLE", "missing icon: IC_%s.tpl", (char *)proto);
 		}
 	}
 }
@@ -3861,7 +3902,16 @@ static char *send_oscam_user_config(struct templatevars *vars, struct uriparams 
 			char channame[CS_SERVICENAME_SIZE];
 			status = (!apicall) ? "<B>connected</B>" : "connected";
 			if(account->expirationdate && account->expirationdate < now) { classname = "expired"; }
-			else { classname = "connected";conn = 1; }
+			else
+			{
+				classname = "connected";conn = 1;
+#ifdef WITH_LB
+				if (account->lb_force_reopen_user == 1)
+				{
+					classname = "forcereopenuserconnected";
+				}
+#endif
+			}
 
 			proto = client_get_proto(latestclient);
 			int clientcaid = latestclient->last_caid;
@@ -3953,7 +4003,16 @@ static char *send_oscam_user_config(struct templatevars *vars, struct uriparams 
 					isactive = 1;
 					status = (!apicall) ? "<B>online</B>" : "online";
 					if(account->expirationdate && account->expirationdate < now) { classname = "expired"; }
-					else { classname = "online"; }
+					else
+					{
+						classname = "online";
+#ifdef WITH_LB
+						if (account->lb_force_reopen_user == 1)
+						{
+							classname = "forcereopenuseronline";
+						}
+#endif
+					}
 					if(latestclient->cwfound + latestclient->cwnot + latestclient->cwcache > 0)
 					{
 						cwrate2 = now - latestclient->login;

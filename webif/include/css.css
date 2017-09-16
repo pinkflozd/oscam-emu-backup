@@ -344,7 +344,7 @@ table.subservicetable {
 
 /* **************** 8. TABLE TR */
 /* for entitlement of readers */
-tr.e_valid td, tr.e_expired td, tr.e_header td {
+tr.e_valid td, tr.e_expired td, tr.e_forcereopenuseronline td, tr.e_forcereopenuserconnected td, tr.e_header td {
 	font-family:"Courier New", monospace
 }
 /* hiding formatline for width of firstrow in config, readers and users / width in info */
@@ -357,11 +357,15 @@ tr.infocolswidth, tr.infocolswidth td, tr.infocolswidth th {
 /* rowcolors for cacheex rows in cachex depend on status */
 tr.e_valid td {background-color:#E6FEBF}
 tr.e_expired td {background-color:#FFF3E7}
+tr.e_forcereopenuseronline td {background-color:#C7D6FF}
+tr.e_forcereopenuserconnected td {background-color:#D2EDFF}
 /* rowcolors for users rows in unserconfig.html depend on status */
 tr.online td.usercol6 {background-color:#DDD}
 tr.online td {background-color:#BFA}
 tr.offline td {}
 tr.expired td {background-color:#FBA}
+tr.forcereopenuseronline td {background-color:#C7D6FF}
+tr.forcereopenuserconnected td {background-color:#D2EDFF}
 tr.connected td {background-color:#FFA}
 /* color of button for readers and user row in readers.html and userconfig.html*/
 tr.disabled td {}
@@ -449,7 +453,7 @@ td.subheadline p {
 td.centered,
 td[class*='statuscol'],		/* shorthand notation td[class*='statuscol'] for  td.statuscol0 -  td.statuscol16 */
 td[class*='usercol'],		/* shorthand notation td[class*='usercol'] for  td.usercol0 -  td.usercol25 */
-td[class*='readercol'] {	/* shorthand notation td[class*='readercol'] for  td.readercol0 -  td.readercol18 */
+td[class*='readercol'] {	/* shorthand notation td[class*='readercol'] for  td.readercol0 -  td.readercol19 */
 	text-align:center
 }
 td.statuscol0 {
@@ -808,6 +812,9 @@ span.e_expired {background-color:#FFF3E7}
 	text-align:center
 }
 
+span.e_forcereopenuseronline {background-color:#C7D6FF}
+span.e_forcereopenuserconnected {background-color:#D2EDFF}
+
 /* **************** 15. GRAPH */
 svg.graph {background-color:#F0F0F0;font-family:Arial;font-size:9px}
 rect.graph_bg {fill:white}
@@ -855,6 +862,8 @@ path.graph_curve {stroke-opacity:0.8;stroke-width:0.7px;fill:none}
 .users tr.online .td-sorting {background-color: #A6EA95}
 .users tr.online td.usercol6.td-sorting {background-color:#C8C8C8}
 .users tr.expired .td-sorting {background-color: #EAA69F}
+.users tr.forcereopenuseronline .td-sorting {background-color: #C7D6FF}
+.users tr.forcereopenuserconnected .td-sorting {background-color: #D2EDFF}
 
 /* **************** 17. POLLING */
 /*  for UL in logpoll.html */

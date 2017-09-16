@@ -306,6 +306,19 @@ void global_fixups_fn(void *UNUSED(var))
 #ifdef WITH_LB
 	if(cfg.lb_save > 0 && cfg.lb_save < 100) { cfg.lb_save = 100; }
 	if(cfg.lb_nbest_readers < 2) { cfg.lb_nbest_readers = DEFAULT_NBEST; }
+
+	bool is_user_lb_force_always = false;
+	struct s_auth *account;
+	for(account = cfg.account; account; account = account->next)
+	{
+		if(account->lb_force_reopen_user == 1)
+		{
+			is_user_lb_force_always = true;
+			break;
+		}
+	}
+	//now disable global lb_force_reopen_always if one of users have enabled user specific force reopen
+	if(is_user_lb_force_always) { cfg.lb_force_reopen_always = 0; }
 #endif
 }
 
@@ -369,6 +382,7 @@ static const struct config_list global_opts[] =
 	DEF_OPT_INT32("lb_min_ecmcount"         , OFS(lb_min_ecmcount),     DEFAULT_MIN_ECM_COUNT),
 	DEF_OPT_INT32("lb_max_ecmcount"         , OFS(lb_max_ecmcount),     DEFAULT_MAX_ECM_COUNT),
 	DEF_OPT_INT32("lb_reopen_seconds"       , OFS(lb_reopen_seconds),   DEFAULT_REOPEN_SECONDS),
+	DEF_OPT_INT32("lb_reopen_seconds_lbmin" , OFS(lb_reopen_seconds_lbmin),   0),
 	DEF_OPT_INT8("lb_reopen_invalid"        , OFS(lb_reopen_invalid),   1),
 	DEF_OPT_INT8("lb_force_reopen_always"   , OFS(lb_force_reopen_always),   0),
 	DEF_OPT_INT32("lb_retrylimit"           , OFS(lb_retrylimit),       DEFAULT_RETRYLIMIT),
@@ -408,9 +422,23 @@ static void anticasc_fixups_fn(void *UNUSED(var))
 	if(cfg.ac_fakedelay < 100 || cfg.ac_fakedelay > 3000) { cfg.ac_fakedelay = 1000; }
 	if(cfg.ac_denysamples < 2 || cfg.ac_denysamples > cfg.ac_samples - 1) { cfg.ac_denysamples = cfg.ac_samples - 1; }
 	if(cfg.ac_denysamples + 1 > cfg.ac_samples) { cfg.ac_denysamples = cfg.ac_samples - 1; }
+	if(cfg.acosc_max_ecms_per_minute < 0) { cfg.acosc_max_ecms_per_minute = 0; }
+	if(cfg.acosc_penalty == 4)
+	{
+		cfg.acosc_max_active_sids = 0; //set default
+		cfg.acosc_zap_limit = 0; //set default
+		//cfg.acosc_penalty_duration = 0; //set default
+
+		if(cfg.acosc_max_ecms_per_minute != 0)
+		{
+			if(cfg.acosc_max_ecms_per_minute < 6) { cfg.acosc_max_ecms_per_minute = 6; }
+			if(cfg.acosc_max_ecms_per_minute > 20) { cfg.acosc_max_ecms_per_minute = 20; }
+			cfg.acosc_penalty_duration = (60 / cfg.acosc_max_ecms_per_minute);
+		}
+	}
 	if(cfg.acosc_max_active_sids < 0) { cfg.acosc_max_active_sids = 0; }
 	if(cfg.acosc_zap_limit < 0) { cfg.acosc_zap_limit = 0; }
-	if(cfg.acosc_penalty < 0 || cfg.acosc_penalty > 3) { cfg.acosc_penalty = 0; }
+	if(cfg.acosc_penalty < 0 || cfg.acosc_penalty > 4) { cfg.acosc_penalty = 0; }
 	if(cfg.acosc_penalty_duration < 0) { cfg.acosc_penalty_duration = 0; }
 	if(cfg.acosc_delay < 0 || cfg.acosc_delay > 4000) { cfg.acosc_delay = 0; }
 }
@@ -433,6 +461,7 @@ static const struct config_list anticasc_opts[] =
 	DEF_OPT_INT32("fakedelay"		, OFS(ac_fakedelay),		3000),
 	DEF_OPT_INT32("denysamples"		, OFS(ac_denysamples),		8),
 	DEF_OPT_INT8("acosc_enabled"		, OFS(acosc_enabled),		0 ),
+	DEF_OPT_INT8("acosc_max_ecms_per_minute"	, OFS(acosc_max_ecms_per_minute),	0 ),
 	DEF_OPT_INT8("acosc_max_active_sids"	, OFS(acosc_max_active_sids),	0 ),
 	DEF_OPT_INT8("acosc_zap_limit"		, OFS(acosc_zap_limit),		0 ),
 	DEF_OPT_INT8("acosc_penalty"		, OFS(acosc_penalty),		0 ),
