@@ -2741,7 +2741,7 @@ static char *send_oscam_reader_config(struct templatevars *vars, struct uriparam
 	tpl_printf(vars, TPLADD, "DRE56FORCEGROUP","%02X", rdr->dre56_force_group);
 #endif
 
-	tpl_addVar(vars, TPLADD, "PROTOCOL", reader_get_type_desc(rdr, 0));
+	tpl_addVar(vars, TPLADD, "PROTOCOL", reader_get_type_desc(rdr));
 
 	// Show only parameters which needed for the reader
 	switch(rdr->typ)
