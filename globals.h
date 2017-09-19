@@ -1341,6 +1341,8 @@ struct s_client
 
 	struct s_client *next;                          //make client a linked list
 	struct s_client *nexthashed;
+
+	int8_t          start_hidecards;
 };
 
 typedef struct s_ecm_whitelist_data
@@ -1765,12 +1767,13 @@ struct s_auth
 	int32_t         ac_users;                       // 0 - unlimited
 	int8_t          ac_penalty;                     // 0 - log, >0 - fake dw
 	struct s_acasc  ac_stat;
+	int8_t			acosc_max_ecms_per_minute;			// user value 0 - unlimited
 	int8_t			acosc_max_active_sids;			// user value 0 - unlimited
 	int8_t			acosc_zap_limit; 				// user value 0 - unlimited
 	int8_t			acosc_penalty;					//user value penalty
 	int32_t			acosc_penalty_duration;			// user value how long is penalty activ in sek.
 	time_t			acosc_penalty_until;
-	int8_t			acosc_penalty_active; 			// 0-deaktiv 1-max_active_sids 2-zap_limit 3-penaly_duration
+	int8_t			acosc_penalty_active; 			// 0-deaktiv 1-max_active_sids 2-zap_limit 3-max_ecms_per_minute 4-penaly_duration
 	int32_t			acosc_delay; 					//user value
 	int8_t			acosc_user_zap_count;
 	time_t			acosc_user_zap_count_start_time;
@@ -1779,6 +1782,8 @@ struct s_auth
 	int32_t         lb_nbest_readers;               // When this is -1, the global lb_nbest_readers is used
 	int32_t         lb_nfb_readers;                 // When this is -1, the global lb_nfb_readers is used
 	CAIDVALUETAB    lb_nbest_readers_tab;           // like nbest_readers, but for special caids
+	int8_t	        lb_force_reopen_user;           // user always force reopening immediately all failing readers if no matching reader found
+	int8_t          lb_force_reopen_user_lb_min;    // user always force reopening immediately all failing readers if no matching reader found but only if ecm count reached lb_min_ecmcount
 #endif
 	IN_ADDR_T       dynip;
 	char            *dyndns;
@@ -2129,6 +2134,7 @@ struct s_config
 	int32_t         lb_min_ecmcount;                // minimal ecm count to evaluate lbvalues
 	int32_t         lb_max_ecmcount;                // maximum ecm count before reseting lbvalues
 	int32_t         lb_reopen_seconds;              // time between retrying failed readers/caids/prov/srv
+	int32_t         lb_reopen_seconds_lbmin;        // time between retrying failed readers/caids/prov/srv which allready have FOUND count >= lb_min_ecmcount
 	int8_t          lb_reopen_invalid;              // default=1; if 0, rc=E_INVALID will be blocked until stats cleaned
 	int8_t          lb_force_reopen_always;         // force reopening immediately all failing readers if no matching reader found
 	int32_t         lb_retrylimit;                  // reopen only happens if reader response time > retrylimit
@@ -2174,6 +2180,7 @@ struct s_config
 	char        *ac_logfile;
 	struct      s_cpmap *cpmap;
 	int8_t      acosc_enabled;
+	int8_t      acosc_max_ecms_per_minute;	// global value 0 - unlimited
 	int8_t      acosc_max_active_sids;// global value 0 - unlimited
 	int8_t      acosc_zap_limit;// global value 0 - unlimited
 	int32_t     acosc_penalty_duration;// global value how long is penalty activ in sek.
