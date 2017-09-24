@@ -631,7 +631,7 @@ extern const char *weekdstr;
 // Return MPEG section length
 #define SCT_LEN(sct) (3+((sct[1]&0x0f)<<8)+sct[2])
 // Used by readers
-#define MAX_LEN      (512+3)
+#define MAX_LEN      256
 
 #define NO_CAID_VALUE  0xfffe
 #define NO_PROVID_VALUE  0xfffffe
