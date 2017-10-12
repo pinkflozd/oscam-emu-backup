@@ -1471,7 +1471,15 @@ void dvbapi_start_emm_filter(int32_t demux_index)
 			}
 			if(match)
 			{
-				csystem = get_cardsystem_by_caid(caid);
+				if(rdr->typ == R_EMU)
+				{
+					csystem = rdr->csystem;
+				}
+				else
+				{
+					csystem = get_cardsystem_by_caid(caid);	
+				}
+				
 				if(csystem)
 				{
 					if(caid != ncaid)
@@ -1490,7 +1498,14 @@ void dvbapi_start_emm_filter(int32_t demux_index)
 					}
 					else if (csystem->get_emm_filter)
 					{
-						csystem->get_emm_filter(rdr, &dmx_filter, &filter_count);
+						if(rdr->typ == R_EMU)
+						{
+							csystem->get_emm_filter_adv(rdr, &dmx_filter, &filter_count, caid, provid, demux[demux_index].program_number);
+						}
+						else
+						{
+							csystem->get_emm_filter(rdr, &dmx_filter, &filter_count);
+						}
 					}
 				}
 				else
@@ -2076,6 +2091,8 @@ int32_t dvbapi_start_descrambling(int32_t demux_id, int32_t pid, int8_t checked,
 	er->vpid  = demux[demux_id].ECMpids[pid].VPID;
 	er->pmtpid  = demux[demux_id].pmtpid;
 	er->onid = demux[demux_id].onid;
+	er->tsid = demux[demux_id].tsid;
+	er->ens  = demux[demux_id].enigma_namespace;
 	er->msgid = msgid;
 
 #ifdef WITH_STAPI5
@@ -2113,17 +2130,37 @@ int32_t dvbapi_start_descrambling(int32_t demux_id, int32_t pid, int8_t checked,
 		if(caid_is_fake(demux[demux_id].ECMpids[pid].CAID) || caid_is_biss(demux[demux_id].ECMpids[pid].CAID))
 		{
 			int32_t j, n;
-			er->ecmlen = 5;
+			er->ecmlen = 7;
 			er->ecm[0] = 0x80; // to pass the cache check it must be 0x80 or 0x81
 			er->ecm[1] = 0x00;
-			er->ecm[2] = 0x02;
+			er->ecm[2] = 0x04;
 			i2b_buf(2, er->srvid, er->ecm + 3);
+			i2b_buf(2, er->pmtpid, er->ecm + 5);
 
-			for(j = 0, n = 5; j < demux[demux_id].STREAMpidcount; j++, n += 2)
+			for(j = 0, n = 7; j < demux[demux_id].STREAMpidcount; j++, n += 2)
 			{
 				i2b_buf(2, demux[demux_id].STREAMpids[j], er->ecm + n);
 				er->ecm[2] += 2;
 				er->ecmlen += 2;
+			}
+
+			// extend the ecm with enigma2's namespace, which for feeds, usually contains the TP frequency
+			if (0 != er->ens && (er->ens >> 16) < 3600) // check namespace for valid orbital pos (restrict to DVB-S only)
+			{
+				er->ens |= 0x80000000; // flag to emu: this is the namespace, not a pid
+
+				// If the onid & sid are deemed valid for a normal service, enigma2 strips the frequency
+				// from the namespace. See https://github.com/openatv/enigma2/blob/master/lib/dvb/scan.cpp#L59
+				// In the case of a null frequency in the fake ecm's namespace, we inject with tsid^onid^ecmpid^0x1FFF.
+				if (0 == (er->ens & 0xFFFF))
+				{
+					er->ens |= (er->tsid ^ er->onid ^ er->pid ^ 0x1FFF); // our custom "transponder identifier"
+					er->ens |= 0x40000000; // nofreq flag: value is not frequency
+				}
+
+				i2b_buf(4, er->ens, er->ecm + 3 + er->ecm[2]); // place namespace after the last stream pid
+				er->ecm[2] += 4;
+				er->ecmlen += 4;
 			}
 
 			cs_log("Demuxer %d trying to descramble PID %d CAID %04X PROVID %06X ECMPID %04X ANY CHID PMTPID %04X VPID %04X", demux_id, pid,
@@ -4374,6 +4411,7 @@ void dvbapi_process_input(int32_t demux_id, int32_t filter_num, uchar *buffer, i
 	if(filtertype == TYPE_ECM)
 	{
 		uint32_t chid = 0x10000;
+		int8_t pvu_skip = 0;
 		ECM_REQUEST *er;
 
 		if(len != 0)  // len = 0 receiver encountered an internal bufferoverflow!
@@ -4400,9 +4438,24 @@ void dvbapi_process_input(int32_t demux_id, int32_t filter_num, uchar *buffer, i
 				return;
 			}
 
-			if(curpid->table == buffer[0] && !caid_is_irdeto(curpid->CAID))  // wait for odd / even ecm change (only not for irdeto!)
+			if(curpid->CAID>>8 == 0x0E)
 			{
-
+				pvu_skip = 1;
+				
+				if(sctlen > 0xb)
+				{
+					if(buffer[0xb] > curpid->pvu_counter || (curpid->pvu_counter == 255 && buffer[0xb] == 0)
+							|| ((curpid->pvu_counter - buffer[0xb]) > 5))
+					{
+						curpid->pvu_counter = buffer[0xb];
+						pvu_skip = 0;
+					}
+				}
+			}
+			
+			if((curpid->table == buffer[0] && !caid_is_irdeto(curpid->CAID)) || pvu_skip)  // wait for odd / even ecm change (only not for irdeto!)
+			{
+				
 				if(!(er = get_ecmtask()))
 				{
 					return;
@@ -4684,6 +4737,40 @@ void dvbapi_process_input(int32_t demux_id, int32_t filter_num, uchar *buffer, i
 			dvbapi_stop_filternum(demux_id, filter_num, msgid);
 			return;
 		}
+		
+#ifdef WITH_EMU
+		if((demux[demux_id].demux_fd[filter_num].caid>>8) == 0x10)
+		{
+			uint32_t i;
+			uint32_t emmhash;
+			
+			if(sctlen < 4)
+			{
+				return;
+			}
+			
+			for(i=0; i+2<sctlen; i++)
+			{
+				if(buffer[i] == 0xF0 && (buffer[i+2] == 0xE1 || buffer[i+2] == 0xE4))
+				{
+					emmhash = (buffer[3]<<8) | buffer[sctlen-2];
+					
+					if(demux[demux_id].demux_fd[filter_num].cadata == emmhash)
+					{
+						return;
+					}
+					
+					demux[demux_id].demux_fd[filter_num].cadata = emmhash;
+					
+					dvbapi_process_emm(demux_id, filter_num, buffer, sctlen);
+					return;
+				}
+			}
+			
+			return;
+		}
+#endif
+		
 		dvbapi_process_emm(demux_id, filter_num, buffer, sctlen);
 	}
 
@@ -6202,6 +6289,9 @@ void dvbapi_send_dcw(struct s_client *client, ECM_REQUEST *er)
 
 		delayer(er, delay);
 
+#ifdef WITH_EMU
+		if(er->caid>>8 != 0x0E || !cfg.emu_stream_relay_enabled)
+#endif
 		switch(selected_api)
 		{
 #if defined(WITH_STAPI) || defined(WITH_STAPI5)
